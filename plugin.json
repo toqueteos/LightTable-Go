@@ -1,0 +1,10 @@
+{
+  "name": "Go",
+  "author": "toqueteos",
+  "version": "0.0.1",
+  "source": "https://github.com/toqueteos/LTGolang",
+  "desc": "Go language plugin for Light Table",
+  "dependencies": {
+  },
+  "behaviors": "go.behaviors"
+}

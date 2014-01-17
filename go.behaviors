@@ -1,0 +1,14 @@
+{:+ {
+     :app [(:lt.objs.plugins/load-js ["codemirror/go.js" "go_compiled.js"])]
+
+     :editor.go [; Same indentation as used by go fmt: using tabs of width 8.
+                 (:lt.objs.editor/tab-settings true 8 8)
+                 ; WIP: post-save hook "go fmt"
+                 ; (:lt.objs.editor.file/on-save :go-fmt)
+                 ]
+
+     :files [(:lt.objs.files/file-types [{:name "Go"
+                                          :exts [:go]
+                                          :mime "text/x-go"
+                                          :tags [:editor.go]}])]
+}}
