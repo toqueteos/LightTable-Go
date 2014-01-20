@@ -1,4 +1,4 @@
-##Go for Light Table
+## Go for Light Table
 
 An unofficial Go language plugin for Light Table.
 
@@ -10,8 +10,8 @@ https://groups.google.com/forum/#!topic/light-table-discussion/Dg0ldzLx4F4
 
 https://groups.google.com/forum/#!topic/light-table-discussion/ow_vhto7uDY
 
-###License
+### License
 
 Copyright (C) 2014 Carlos Cobo <toqueteos@gmail.com>.
 
-Distributed under the GPLv3, see license.md for the full text.
+Distributed under the MIT license, see LICENSE.md for the full text.
