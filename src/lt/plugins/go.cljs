@@ -11,12 +11,13 @@
             [lt.objs.notifos :as notifos]
             [lt.objs.popup :as popup]
             [lt.objs.eval :as eval]
-            [lt.objs.console :as console])
+            [lt.objs.console :as console]
+
+            [lt.objs.tabs :as tabs])
   (:require-macros [lt.macros :refer [behavior]]))
 
 ;; Declares a new object called "go-lang" and also lets you asign things to it;
 ;; in your case a set of with just a tag.
-;;
 (object/object* ::go-lang
                 :tags #{:go.lang})
 
@@ -26,9 +27,9 @@
   (let [dir plugins/*plugin-dir*]
     (if (nil? dir)
       (files/join plugins/plugins-dir "go" "client" "echo_server.go")
-      dir)))
+      (files/join dir))))
 
-;; Create atom of ::go-lang (mutable)
+;; Create object ::go-lang
 (def go (object/create ::go-lang))
 
 ;;
@@ -98,7 +99,7 @@
                                      :code (ed/selection editor)
                                      :meta {:start (-> (ed/->cursor editor "start") :line)
                                             :end (-> (ed/->cursor editor "end") :line)})
-                                   (js/alert "make a selection."))]
+                                   (assoc info :pos pos :code code))]
                         (object/raise go :eval! {:origin editor
                                                  :info info}))))
 
@@ -107,14 +108,16 @@
           :reaction (fn [this event]
                       (let [{:keys [info origin]} event
                             client (-> @origin :client :default)]
-                        (notifos/working "Connecting")
+                        (notifos/working "")
                         (clients/send (eval/get-client! {:command :editor.eval.go
                                                          :origin origin
                                                          :info info
                                                          :create try-connect})
                                       :editor.eval.go
                                       info
-                                      :only origin))))
+                                      :only
+                                      origin)
+                        (notifos/done-working))))
 
 ;; When is this triggered? ::eval! above passes try-connect along by itself.
 (behavior ::connect
@@ -126,4 +129,6 @@
 (behavior ::go-result
           :triggers #{:editor.eval.go.result}
           :reaction (fn [editor res]
-                      (notifos/done-working)))
+                      (notifos/done-working)
+                      (object/raise editor :editor.result (:result res) {:line (:end (:meta res))
+                                                                         :start-line (-> res :meta :start)})))
