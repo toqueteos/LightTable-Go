@@ -3,12 +3,15 @@
 
      :clients []
 
-     :editor.go [; Same indentation as used by go fmt: using tabs of width 8.
-                 (:lt.objs.editor/tab-settings true 8 8)
-                 :lt.plugins.go/on-eval.one
+     :editor.go [:lt.plugins.go/on-eval.one
                  :lt.plugins.go/go-result
+                 :lt.pluging.go/fmt
+
+                 ; Same indentation as used by go fmt: using tabs of width 8.
+                 (:lt.objs.editor/tab-settings true 8 8)
+
                  ; WIP: post-save hook "go fmt"
-                 ; (:lt.objs.editor.file/on-save :go-fmt)
+                 ; (:lt.objs.editor.file/on-save :go.fmt)
                  ]
 
      :files [(:lt.objs.files/file-types [{:name "Go"

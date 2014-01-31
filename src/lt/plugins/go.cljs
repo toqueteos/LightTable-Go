@@ -1,38 +1,42 @@
 (ns lt.plugins.go
   (:require [lt.object :as object]
+            [lt.objs.clients :as clients]
+            [lt.objs.clients.tcp :as tcp]
+            [lt.objs.command :as cmd]
+            [lt.objs.console :as console]
             [lt.objs.editor :as ed]
             [lt.objs.editor.pool :as pool]
-            [lt.objs.command :as cmd]
-            [lt.objs.clients.tcp :as tcp]
-            [lt.objs.clients :as clients]
-            [lt.objs.proc :as proc]
-            [lt.objs.files :as files]
-            [lt.objs.plugins :as plugins]
-            [lt.objs.notifos :as notifos]
-            [lt.objs.popup :as popup]
             [lt.objs.eval :as eval]
-            [lt.objs.console :as console]
-
+            [lt.objs.files :as files]
+            [lt.objs.notifos :as notifos]
+            [lt.objs.plugins :as plugins]
+            [lt.objs.popup :as popup]
+            [lt.objs.proc :as proc]
             [lt.objs.tabs :as tabs])
   (:require-macros [lt.macros :refer [behavior]]))
 
 ;; Declares a new object called "go-lang" and also lets you asign things to it;
 ;; in your case a set of with just a tag.
 (object/object* ::go-lang
-                :tags #{:go.lang})
+                :tags #{:go.lang}
+                :behaviors [::fmt])
 
-;; Provide a fallback for plugins/*plugin-dir* which is an empty string
-;; at dev stage (using LightTable UI).
+;; This is, *sadly*, required to run other processes via JS.
+;; Sometimes the amount of abstractions to deal with to do
+;; simple things is ridiculous.
+(def exec (.-exec (js/require "child_process")))
+
 (def client-path
+  "Provides a fallback path at dev stage for plugins/*plugin-dir*, which
+  returns an empty string when using LightTable UI."
   (let [dir plugins/*plugin-dir*]
-    (if (nil? dir)
-      (files/join plugins/plugins-dir "go" "client" "echo_server.go")
-      (files/join dir))))
+    (files/join (if (nil? dir) plugins/plugins-dir dir)
+                "go" "client" "echo_server.go")))
 
 ;; Create object ::go-lang
 (def go (object/create ::go-lang))
 
-;;
+;; Attempts to establish a connection with the Go client.
 (defn try-connect [{:keys [info]}]
   (let [path (:path info)
         client (clients/client! :go.client)
@@ -106,8 +110,7 @@
 (behavior ::eval!
           :triggers #{:eval!}
           :reaction (fn [this event]
-                      (let [{:keys [info origin]} event
-                            client (-> @origin :client :default)]
+                      (let [{:keys [info origin]} event]
                         (notifos/working "")
                         (clients/send (eval/get-client! {:command :editor.eval.go
                                                          :origin origin
@@ -130,5 +133,44 @@
           :triggers #{:editor.eval.go.result}
           :reaction (fn [editor res]
                       (notifos/done-working)
-                      (object/raise editor :editor.result (:result res) {:line (:end (:meta res))
-                                                                         :start-line (-> res :meta :start)})))
+                      (object/raise editor
+                                    :editor.result
+                                    (:result res)
+                                    {:line (:end (:meta res))
+                                     :start-line (-> res :meta :start)})))
+
+;; go fmt
+(defn cwf->path []
+  "Returns current working file path."
+  (-> (pool/last-active) tabs/->path))
+
+(defn run-cmd [cmd & args]
+  (let [child (exec (str cmd args)
+                         nil
+                         (fn [err stdout stderr]
+                           (if err
+                             (println (str "err: " err))
+                             ;(println stdout stderr)
+                             )))
+        ;input (.-stdin child)
+        ;output (.-stdout child)
+        ]
+    ;(do (.end input))
+    ))
+
+(defn gofmt []
+  (let [current-file (cwf->path)
+        cmd (str "gofmt -w " current-file)]
+    (notifos/working "gofmting...")
+    (run-cmd cmd)
+    (notifos/done-working "")))
+
+;; This should trigger
+(behavior ::fmt
+          :triggers #{:save}
+          :reaction (fn []
+                      (println "Saved!")))
+
+(cmd/command {:command ::go.fmt
+              :desc "Go: fmt current file"
+              :exec gofmt})
