@@ -1,11 +1,9 @@
 {:+ {
      :app [(:lt.objs.plugins/load-js ["codemirror/go.js" "go_compiled.js"])]
 
-     :clients []
-
      :editor.go [:lt.plugins.go/on-eval.one
                  :lt.plugins.go/go-result
-                 :lt.pluging.go/fmt
+                 :lt.plugins.go/fmt-on-save
 
                  ; Same indentation as used by go fmt: using tabs of width 8.
                  (:lt.objs.editor/tab-settings true 8 8)

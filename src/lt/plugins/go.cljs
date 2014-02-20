@@ -19,7 +19,7 @@
 ;; in your case a set of with just a tag.
 (object/object* ::go-lang
                 :tags #{:go.lang}
-                :behaviors [::fmt])
+                :behaviors [::fmt-on-save])
 
 ;; This is, *sadly*, required to run other processes via JS.
 ;; Sometimes the amount of abstractions to deal with to do
@@ -145,32 +145,38 @@
   (-> (pool/last-active) tabs/->path))
 
 (defn run-cmd [cmd & args]
+  "Runs `cmd` with `args`. Probably buggy, check implementation."
   (let [child (exec (str cmd args)
                          nil
                          (fn [err stdout stderr]
                            (if err
-                             (println (str "err: " err))
-                             ;(println stdout stderr)
-                             )))
+                             (println "err: " err)
+                             (println "no err"))))
         ;input (.-stdin child)
         ;output (.-stdout child)
         ]
     ;(do (.end input))
     ))
 
-(defn gofmt []
-  (let [current-file (cwf->path)
-        cmd (str "gofmt -w " current-file)]
-    (notifos/working "gofmting...")
+(defn gofmt [file]
+  "Performs `gofmt -w file`."
+  (let [cmd (str "gofmt -w " file)]
+    (notifos/working (format "gofmt %s..." file))
     (run-cmd cmd)
     (notifos/done-working "")))
 
 ;; This should trigger
-(behavior ::fmt
+(behavior ::fmt-on-save
           :triggers #{:save}
-          :reaction (fn []
-                      (println "Saved!")))
+          :reaction (fn [editor]
+                      (println "::fmt-on-save")
+                      (let [path (-> @editor :info :path)]
+                        (println "file" path)
+                        (gofmt path))
+                      ;(cmd/exec! :go-fmt nil)
+                      ))
 
-(cmd/command {:command ::go.fmt
+(cmd/command {:command ::go-fmt
               :desc "Go: fmt current file"
-              :exec gofmt})
+              :exec (fn []
+                      (gofmt (cwf->path)))})
