@@ -6,7 +6,7 @@ I'm not a Clojure expert so don't expect too much fanciness here, changes are we
 
 ### Features
 
-1. `go fmt` integration, via command, working on fmt after each save.
+1. `go fmt` integration, via command and after each save.
 2. Dummy eval `Ctrl+Enter` (check client/echo_server.go) instead of code evaluation. Needs integration with MarGo (like [GoSublime](https://github.com/DisposaBoy/GoSublime)).
 
 ### Credits
