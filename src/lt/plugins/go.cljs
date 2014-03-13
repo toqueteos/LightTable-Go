@@ -15,7 +15,7 @@
             [lt.objs.tabs :as tabs])
   (:require-macros [lt.macros :refer [behavior]]))
 
-;; Declares a new object called "go-lang" and also lets you asign things to it;
+;; Declares a new object called "go-lang" and also lets you assign things to it;
 ;; in your case a set of with just a tag.
 (object/object* ::go-lang
                 :tags #{:go.lang}
@@ -162,7 +162,7 @@
 (defn gofmt [file]
   "Performs `gofmt -w file`."
   (let [cmd (str "gofmt -w " file)]
-    (notifos/working (str "gofmt " file))
+    (notifos/working (str "gofmt " file "..."))
     (run-cmd cmd)
     (notifos/done-working "")))
 
