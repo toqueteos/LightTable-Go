@@ -26,6 +26,7 @@
 ;; simple things is ridiculous.
 (def exec (.-exec (js/require "child_process")))
 
+
 (def client-path
   "Provides a fallback path at dev stage for plugins/*plugin-dir*, which
   returns an empty string when using LightTable UI."
@@ -151,7 +152,7 @@
                          (fn [err stdout stderr]
                            (if err
                              (println "err: " err)
-                             (println "no err"))))
+                             (println stdout))))
         ;input (.-stdin child)
         ;output (.-stdout child)
         ]
@@ -161,7 +162,7 @@
 (defn gofmt [file]
   "Performs `gofmt -w file`."
   (let [cmd (str "gofmt -w " file)]
-    (notifos/working (format "gofmt %s..." file))
+    (notifos/working (str "gofmt " file))
     (run-cmd cmd)
     (notifos/done-working "")))
 
@@ -169,14 +170,37 @@
 (behavior ::fmt-on-save
           :triggers #{:save}
           :reaction (fn [editor]
-                      (println "::fmt-on-save")
                       (let [path (-> @editor :info :path)]
-                        (println "file" path)
-                        (gofmt path))
-                      ;(cmd/exec! :go-fmt nil)
-                      ))
+                        (gofmt path)
+                        (pool/reload editor))))
 
 (cmd/command {:command ::go-fmt
               :desc "Go: fmt current file"
               :exec (fn []
                       (gofmt (cwf->path)))})
+
+;; go build
+(defn gobuild [file]
+  "Performs `go build file`."
+  (let [cmd (str "go build -o " (str (files/parent file) files/separator "main.exe" ) " " file )]
+    (notifos/working (str "go build " file))
+    (run-cmd cmd)
+    (notifos/done-working "")))
+
+(cmd/command {:command ::go-build
+              :desc "Go: Build current file"
+              :exec (fn []
+                      (gobuild (cwf->path)))})
+
+;; go run
+(defn gorun [file]
+  "Performs `go run file`."
+  (let [cmd (str "go run " file )]
+    (notifos/working (str "go run " file ))
+    (run-cmd cmd)
+    (notifos/done-working)))
+
+(cmd/command {:command ::go-run
+              :desc "Go: Run current file"
+              :exec (fn []
+                      (gorun (cwf->path)))})
