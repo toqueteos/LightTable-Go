@@ -2,12 +2,14 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"net"
 	"os"
+	"os/exec"
 	"os/signal"
 	"strconv"
 	"strings"
@@ -164,6 +166,11 @@ func Handle() {
 
 			wg.Add(1)
 			go EvalHandler(m)
+		case "editor.autocomplete.go":
+			log.Println("[Handle] Got Autocomplete message", m)
+
+			wg.Add(1)
+			go AutoCompleteHandler(m)
 		}
 	}
 }
@@ -185,6 +192,50 @@ func EvalHandler(m *Message) {
 	Send(m.Cid, "editor.eval.go.result", i)
 }
 
+// AutoCompleteHandler sends responses to "editor.autocomplete.go" requests.
+func AutoCompleteHandler(m *Message) {
+	defer wg.Done()
+
+	var code string = m.Info.Code
+	var pos *Pos = m.Info.Pos
+	var splitCode []string = strings.Split(code, "\n")
+	var byteCount int = 0
+
+	for lineNum, line := range splitCode {
+		if lineNum == pos.Line {
+			byteCount = byteCount + pos.Ch
+			break
+		}
+		byteCount = byteCount + len(line) + 1 // +1 for the newline that strings.Split removed
+	}
+
+	cmd := exec.Command("C:\\Users\\Joel\\Desktop\\LightTable\\plugins\\LightTable-Go\\gocode\\gocode.exe", "-f=json", "autocomplete", fmt.Sprintf("%s", byteCount))
+
+	cmd.Stdin = strings.NewReader(code)
+	var out bytes.Buffer
+	cmd.Stdout = &out
+	err := cmd.Run()
+	if err != nil {
+		log.Println("")
+		log.Println("Autocomplete error")
+	} else {
+		log.Println("")
+		log.Println(out.String())
+	}
+
+	var i Info
+
+	// Echo message back
+	if m.Info.Code == "" {
+		m.Info.Code = "Nothing selected. Line echo not implemented yet."
+	}
+
+	i.Result = m.Info.Code
+	i.Pos = m.Info.Pos
+
+	Send(m.Cid, "editor.hints.go.result", i)
+}
+
 type Message struct {
 	Cid  int
 	Cmd  string
@@ -202,6 +253,7 @@ type Info struct {
 	Tags       []string `json:"tags,omitempty"`
 	TypeName   string   `json:"type-name,omitempty"`
 	Result     string   `json:"result,omitempty"`
+	Hints      []string `json:"hints,omitempty"`
 	// Msg      string   `json:"msg,omitempty"`
 	// File     string   `json:"file,omitempty"`
 }

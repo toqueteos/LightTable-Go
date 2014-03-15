@@ -1,6 +1,12 @@
 {:+ {
      :app [(:lt.objs.plugins/load-js ["codemirror/go.js" "go_compiled.js"])]
 
+     :editor.go.hints [;;:lt.plugins.clojure/clj-result ;; to get hints
+                       :lt.plugins.go/trigger-update-hints
+                       :lt.plugins.go/finish-update-hints
+                       :lt.plugins.go/use-local-hints
+                    ]
+
      :editor.go [:lt.plugins.go/on-eval.one
                  :lt.plugins.go/go-result
                  :lt.plugins.go/fmt-on-save
@@ -10,6 +16,8 @@
 
                  ; WIP: post-save hook "go fmt"
                  ; (:lt.objs.editor.file/on-save :go.fmt)
+
+                 (:lt.object/add-tag :editor.go.hints)
                  ]
 
      :files [(:lt.objs.files/file-types [{:name "Go"

@@ -171,8 +171,7 @@
           :triggers #{:save}
           :reaction (fn [editor]
                       (let [path (-> @editor :info :path)]
-                        (gofmt path)
-                        (pool/reload editor))))
+                        (gofmt path))))
 
 (cmd/command {:command ::go-fmt
               :desc "Go: fmt current file"
@@ -204,3 +203,37 @@
               :desc "Go: Run current file"
               :exec (fn []
                       (gorun (cwf->path)))})
+
+;;****************************************************
+;; autocomplete
+;;****************************************************
+
+(behavior ::trigger-update-hints
+          :triggers #{:editor.go.hints.update!}
+          :debounce 100
+          :reaction (fn [editor res]
+                      (when-let [default-client (-> @editor :client :default)] ;; dont eval unless we're already connected
+                        (when @default-client
+                          (let [info (:info @editor)
+                                command (->dottedkw :editor (-> info :mime mime->type) :hints)]
+                            (clients/send (eval/get-client! {:command command
+                                                             :info info
+                                                             :origin editor
+                                                             :create try-connect})
+                                          command info :only editor))))))
+
+(behavior ::finish-update-hints
+          :triggers #{:editor.go.hints.result}
+          :reaction (fn [editor res]
+                      (object/merge! editor {::hints res})
+                      (object/raise auto-complete/hinter :refresh!)))
+
+(behavior ::use-local-hints
+          :triggers #{:hints+}
+          :reaction (fn [editor hints token]
+                      (when (not= token (::token @editor))
+                        (object/merge! editor {::token token})
+                        (object/raise editor :editor.go.hints.update!))
+                      (if-let [go-hints (::hints @editor)]
+                        (concat go-hints hints)
+                        hints)))
