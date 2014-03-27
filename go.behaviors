@@ -26,4 +26,6 @@
 
      :go.lang [:lt.plugins.go/eval!
                :lt.plugins.go/connect]
+
+     :go.client []
 }}

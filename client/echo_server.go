@@ -115,6 +115,7 @@ func Start() {
 		log.Fatalln("[Start] json.Marshal error:", err)
 	}
 
+	// Activate the autocomplete server
 	var gocode *exec.Cmd
 	gocode = exec.Command("gocode")
 	gocodeActive = true
@@ -124,6 +125,8 @@ func Start() {
 	}
 
 	log.Printf("Sending starting message to LightTable: %s", msg)
+	// Tell Light Table we're connected
+	fmt.Printf("connected")
 
 	buf := bufio.NewWriter(client)
 	buf.Write(msg)
@@ -141,6 +144,7 @@ func Stop() {
 			log.Fatalln("[Stop] Unable to close gocode.")
 		}
 	}
+	client.Close()
 
 	log.Println("Stop!")
 	os.Exit(0)

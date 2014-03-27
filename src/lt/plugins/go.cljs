@@ -58,7 +58,7 @@
                       (console/log ":on-out")
                       (let [out (.toString data)]
                         (object/update! this [:buffer] str out)
-                        (when (> (.indexOf out "Connected") -1)
+                        (when (> (.indexOf out "connected") -1)
                           (do
                             (notifos/done-working)
                             (object/merge! this {:connected true})
@@ -70,7 +70,7 @@
                       (console/log ":on-error")
                       (let [out (.toString data)]
                         (console/log out)
-                        (when-not (> (.indexOf (:buffer @this) "Connected") -1)
+                        (when-not (> (.indexOf (:buffer @this) "connected") -1)
                           (object/update! this [:buffer] str data)))))
 
 (behavior ::on-exit
