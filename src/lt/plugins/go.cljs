@@ -33,7 +33,7 @@
   returns an empty string when using LightTable UI."
   (let [dir plugins/*plugin-dir*]
     (files/join (if (nil? dir) plugins/plugins-dir dir)
-                "go" "client" "echo_server.go")))
+                "LightTable-Go" "client" "light_table_go_client.go")))
 
 ;; Create object ::go-lang
 (def go (object/create ::go-lang))
