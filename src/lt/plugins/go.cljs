@@ -12,7 +12,8 @@
             [lt.objs.plugins :as plugins]
             [lt.objs.popup :as popup]
             [lt.objs.proc :as proc]
-            [lt.objs.tabs :as tabs])
+            [lt.objs.tabs :as tabs]
+            [lt.plugins.auto-complete :as auto-complete])
   (:require-macros [lt.macros :refer [behavior]]))
 
 ;; Declares a new object called "go-lang" and also lets you assign things to it;
@@ -207,26 +208,39 @@
 ;;****************************************************
 ;; autocomplete
 ;;****************************************************
-
+;(comment
 (behavior ::trigger-update-hints
           :triggers #{:editor.go.hints.update!}
           :debounce 100
           :reaction (fn [editor res]
-                      (when-let [default-client (-> @editor :client :default)] ;; dont eval unless we're already connected
-                        (when @default-client
-                          (let [info (:info @editor)
-                                command (->dottedkw :editor (-> info :mime mime->type) :hints)]
-                            (clients/send (eval/get-client! {:command command
-                                                             :info info
-                                                             :origin editor
-                                                             :create try-connect})
-                                          command info :only editor))))))
+                      (console/log "Updating")
+                      (let [command :editor.go.hints
+                            cursor-location (ed/->cursor editor)
+                            info (assoc (@editor :info)
+                                  :pos cursor-location
+                                  :line (ed/line editor (:line cursor-location))
+                                  :code (.getValue (ed/get-doc editor))
+                                  :path (cwf->path))]
+                          (clients/send (eval/get-client! {:command command
+                                                           :info info
+                                                           :origin editor
+                                                           :create try-connect})
+                                        command
+                                        info
+                                        :only
+                                        editor)
+                          )))
+
 
 (behavior ::finish-update-hints
           :triggers #{:editor.go.hints.result}
           :reaction (fn [editor res]
-                      (object/merge! editor {::hints res})
-                      (object/raise auto-complete/hinter :refresh!)))
+                      (let [hints (map #(do #js {:completion %})(:hints res))]
+                        (console/log (str hints))
+                        (object/merge! editor {::hints hints})
+                        (object/raise auto-complete/hinter :refresh!))))
+
+
 
 (behavior ::use-local-hints
           :triggers #{:hints+}
@@ -235,5 +249,30 @@
                         (object/merge! editor {::token token})
                         (object/raise editor :editor.go.hints.update!))
                       (if-let [go-hints (::hints @editor)]
-                        (concat go-hints hints)
-                        hints)))
+                        go-hints
+                        ;; If tern hasn't responded with hints, we still need to return something or else
+                        ;; the autocomplete box will be inactive when a response comes from the server.
+                        (:lt.plugins.auto-complete/hints @editor))))
+
+(behavior ::line-change
+          :triggers #{:line-change}
+          :reaction (fn [editor line change]
+                      (when (-> (.-text line) last (= "."))
+                        (cmd/exec! ::clear-token))))
+
+(behavior ::clear-token
+          :triggers #{:select :select-unknown :escape!}
+          :reaction (fn [_]
+                      (cmd/exec! ::clear-token)))
+
+
+(cmd/command {:command ::clear-token
+              :desc "Editor: Clear last Tern token"
+              :hidden true
+              :exec (fn []
+                      (object/merge! (pool/last-active) {::token :none
+                                                         ::hints nil}))})
+
+
+
+;)

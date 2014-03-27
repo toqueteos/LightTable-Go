@@ -166,7 +166,7 @@ func Handle() {
 
 			wg.Add(1)
 			go EvalHandler(m)
-		case "editor.autocomplete.go":
+		case "editor.go.hints":
 			log.Println("[Handle] Got Autocomplete message", m)
 
 			wg.Add(1)
@@ -196,32 +196,41 @@ func EvalHandler(m *Message) {
 func AutoCompleteHandler(m *Message) {
 	defer wg.Done()
 
-	var code string = m.Info.Code
+	var code string = strings.Replace(m.Info.Code, "\\n", "\n", -1)
 	var pos *Pos = m.Info.Pos
-	var splitCode []string = strings.Split(code, "\n")
+	var path string = m.Info.Path
+	var splitCode []string = strings.Split(strings.Replace(code, "\\n", "\n", -1), "\n")
 	var byteCount int = 0
+
+	//lineCount := len(splitCode)
+	log.Printf("Path: %s", path)
 
 	for lineNum, line := range splitCode {
 		if lineNum == pos.Line {
 			byteCount = byteCount + pos.Ch
+			log.Println(code[byteCount-10 : byteCount])
+
 			break
 		}
 		byteCount = byteCount + len(line) + 1 // +1 for the newline that strings.Split removed
 	}
 
-	cmd := exec.Command("C:\\Users\\Joel\\Desktop\\LightTable\\plugins\\LightTable-Go\\gocode\\gocode.exe", "-f=json", "autocomplete", fmt.Sprintf("%s", byteCount))
+	cmd := exec.Command("gocode", "-f=csv", "autocomplete", path, fmt.Sprintf("%s", byteCount))
+	//cmd := exec.Command("C:\\Users\\Joel\\Desktop\\LightTable\\plugins\\LightTable-Go\\gocode\\gocode.exe", "-f=csv", "autocomplete", path, fmt.Sprintf("%s", byteCount))
 
-	cmd.Stdin = strings.NewReader(code)
+	var in *strings.Reader = strings.NewReader(code)
+	cmd.Stdin = in
 	var out bytes.Buffer
 	cmd.Stdout = &out
+
 	err := cmd.Run()
 	if err != nil {
 		log.Println("")
 		log.Println("Autocomplete error")
-	} else {
-		log.Println("")
-		log.Println(out.String())
 	}
+
+	log.Printf("Code bytes %d\n", len(code))
+	log.Printf("Bytes remaining %d\n", in.Len)
 
 	var i Info
 
@@ -233,7 +242,22 @@ func AutoCompleteHandler(m *Message) {
 	i.Result = m.Info.Code
 	i.Pos = m.Info.Pos
 
-	Send(m.Cid, "editor.hints.go.result", i)
+	// Parse the autocomplete results
+
+	log.Println(out.String())
+	var unprocessed_hints []string = strings.Split(out.String(), "\n")
+	var hints []string = make([]string, len(unprocessed_hints))
+
+	for i, hint := range unprocessed_hints {
+		temp := strings.Split(hint, ",")
+		if len(temp) > 3 {
+			hints[i] = temp[2]
+		}
+	}
+
+	i.Hints = hints
+
+	Send(m.Cid, "editor.go.hints.result", i)
 }
 
 type Message struct {
