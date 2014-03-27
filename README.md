@@ -10,6 +10,7 @@ I'm not a Clojure expert so don't expect too much fanciness here, changes are we
 2. Dummy eval `Ctrl+Enter` (check client/echo_server.go) instead of code evaluation. Needs integration with MarGo (like [GoSublime](https://github.com/DisposaBoy/GoSublime)).
 3. `go build` integration, via command. Builds in current file directory
 4. `go run` integration, via command.
+5. Package sensitive autocompletion, via [gocode](https://github.com/nsf/gocode). Gocode must be installed on your system & available on your path for this to work.
 
 ### Credits
 

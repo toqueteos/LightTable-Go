@@ -1,8 +1,7 @@
 {:+ {
      :app [(:lt.objs.plugins/load-js ["codemirror/go.js" "go_compiled.js"])]
 
-     :editor.go.hints [;;:lt.plugins.clojure/clj-result ;; to get hints
-                       :lt.plugins.go/trigger-update-hints
+     :editor.go.hints [:lt.plugins.go/trigger-update-hints
                        :lt.plugins.go/finish-update-hints
                        :lt.plugins.go/use-local-hints
                     ]

@@ -1,2 +1,2 @@
 Carlos Cobo <toqueteos@gmail.com>
-Joel Hobson
+Joel Hobson <joel.hobsn@gmail.com>

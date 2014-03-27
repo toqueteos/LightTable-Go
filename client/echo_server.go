@@ -34,6 +34,7 @@ func init() {
 var client net.Conn
 var stop bool // Same as: var stop = false
 var wg sync.WaitGroup
+var gocodeActive bool //false if we're unable to start gocode.
 
 func main() {
 	var err error
@@ -114,6 +115,14 @@ func Start() {
 		log.Fatalln("[Start] json.Marshal error:", err)
 	}
 
+	var gocode *exec.Cmd
+	gocode = exec.Command("gocode")
+	gocodeActive = true
+	if gocode.Start() != nil {
+		log.Println("Unable to start gocode. Autocompletion is disabled.")
+		gocodeActive = false
+	}
+
 	log.Printf("Sending starting message to LightTable: %s", msg)
 
 	buf := bufio.NewWriter(client)
@@ -125,6 +134,14 @@ func Start() {
 func Stop() {
 	stop = true
 	wg.Wait()
+
+	// Shut down gocode
+	if gocodeActive {
+		if exec.Command("gocode", "close").Run() != nil {
+			log.Fatalln("[Stop] Unable to close gocode.")
+		}
+	}
+
 	log.Println("Stop!")
 	os.Exit(0)
 }
@@ -168,9 +185,12 @@ func Handle() {
 			go EvalHandler(m)
 		case "editor.go.hints":
 			log.Println("[Handle] Got Autocomplete message", m)
-
-			wg.Add(1)
-			go AutoCompleteHandler(m)
+			if gocodeActive {
+				wg.Add(1)
+				go AutoCompleteHandler(m)
+			} else {
+				log.Println("[Handle] gocode not running, ignoring autocomplete", m)
+			}
 		}
 	}
 }
@@ -201,57 +221,44 @@ func AutoCompleteHandler(m *Message) {
 	var path string = m.Info.Path
 	var splitCode []string = strings.Split(strings.Replace(code, "\\n", "\n", -1), "\n")
 	var byteCount int = 0
-
-	//lineCount := len(splitCode)
-	log.Printf("Path: %s", path)
+	var in *strings.Reader
+	var out bytes.Buffer
+	var i Info
+	var unprocessed_hints []string
+	var hints []string
 
 	for lineNum, line := range splitCode {
 		if lineNum == pos.Line {
 			byteCount = byteCount + pos.Ch
-			log.Println(code[byteCount-10 : byteCount])
-
 			break
 		}
 		byteCount = byteCount + len(line) + 1 // +1 for the newline that strings.Split removed
 	}
 
-	cmd := exec.Command("gocode", "-f=csv", "autocomplete", path, fmt.Sprintf("%s", byteCount))
-	//cmd := exec.Command("C:\\Users\\Joel\\Desktop\\LightTable\\plugins\\LightTable-Go\\gocode\\gocode.exe", "-f=csv", "autocomplete", path, fmt.Sprintf("%s", byteCount))
+	// If the incoming source code is unicode, should be c%d below.
+	cmd := exec.Command("gocode", "-f=csv", "autocomplete", path, fmt.Sprintf("%d", byteCount))
 
-	var in *strings.Reader = strings.NewReader(code)
+	in = strings.NewReader(code)
 	cmd.Stdin = in
-	var out bytes.Buffer
 	cmd.Stdout = &out
 
 	err := cmd.Run()
 	if err != nil {
-		log.Println("")
-		log.Println("Autocomplete error")
-	}
-
-	log.Printf("Code bytes %d\n", len(code))
-	log.Printf("Bytes remaining %d\n", in.Len)
-
-	var i Info
-
-	// Echo message back
-	if m.Info.Code == "" {
-		m.Info.Code = "Nothing selected. Line echo not implemented yet."
+		log.Println("[AutoCompleteHandler] Couldn't exec gocode.")
+		return
 	}
 
 	i.Result = m.Info.Code
 	i.Pos = m.Info.Pos
 
 	// Parse the autocomplete results
-
-	log.Println(out.String())
-	var unprocessed_hints []string = strings.Split(out.String(), "\n")
-	var hints []string = make([]string, len(unprocessed_hints))
+	unprocessed_hints = strings.Split(out.String(), "\n")
+	hints = make([]string, len(unprocessed_hints))
 
 	for i, hint := range unprocessed_hints {
-		temp := strings.Split(hint, ",")
-		if len(temp) > 3 {
-			hints[i] = temp[2]
+		splitHints := strings.Split(hint, ",")
+		if len(splitHints) >= 5 {
+			hints[i] = splitHints[2] //splitHints[4] has the function signature data, but light table can't use that yet.
 		}
 	}
 

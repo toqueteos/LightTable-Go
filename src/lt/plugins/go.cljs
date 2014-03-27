@@ -33,7 +33,7 @@
   returns an empty string when using LightTable UI."
   (let [dir plugins/*plugin-dir*]
     (files/join (if (nil? dir) plugins/plugins-dir dir)
-                "LightTable-Go" "client" "echo_server.go")))
+                "go" "client" "echo_server.go")))
 
 ;; Create object ::go-lang
 (def go (object/create ::go-lang))
@@ -206,14 +206,13 @@
                       (gorun (cwf->path)))})
 
 ;;****************************************************
-;; autocomplete
+;; Autocomplete
 ;;****************************************************
-;(comment
+
 (behavior ::trigger-update-hints
           :triggers #{:editor.go.hints.update!}
           :debounce 100
           :reaction (fn [editor res]
-                      (console/log "Updating")
                       (let [command :editor.go.hints
                             cursor-location (ed/->cursor editor)
                             info (assoc (@editor :info)
@@ -235,8 +234,8 @@
 (behavior ::finish-update-hints
           :triggers #{:editor.go.hints.result}
           :reaction (fn [editor res]
+                      ;Completions are of the format (#js {:completion "suggestion1"} #js {:completion "suggestion2"})
                       (let [hints (map #(do #js {:completion %})(:hints res))]
-                        (console/log (str hints))
                         (object/merge! editor {::hints hints})
                         (object/raise auto-complete/hinter :refresh!))))
 
@@ -250,29 +249,4 @@
                         (object/raise editor :editor.go.hints.update!))
                       (if-let [go-hints (::hints @editor)]
                         go-hints
-                        ;; If tern hasn't responded with hints, we still need to return something or else
-                        ;; the autocomplete box will be inactive when a response comes from the server.
                         (:lt.plugins.auto-complete/hints @editor))))
-
-(behavior ::line-change
-          :triggers #{:line-change}
-          :reaction (fn [editor line change]
-                      (when (-> (.-text line) last (= "."))
-                        (cmd/exec! ::clear-token))))
-
-(behavior ::clear-token
-          :triggers #{:select :select-unknown :escape!}
-          :reaction (fn [_]
-                      (cmd/exec! ::clear-token)))
-
-
-(cmd/command {:command ::clear-token
-              :desc "Editor: Clear last Tern token"
-              :hidden true
-              :exec (fn []
-                      (object/merge! (pool/last-active) {::token :none
-                                                         ::hints nil}))})
-
-
-
-;)
