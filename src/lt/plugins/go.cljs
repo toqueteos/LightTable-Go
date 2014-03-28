@@ -141,45 +141,36 @@
                                     {:line (:end (:meta res))
                                      :start-line (-> res :meta :start)})))
 
-;; go fmt
+;;****************************************************
+;; Utility functions
+;;****************************************************
+
 (defn cwf->path []
   "Returns current working file path."
   (-> (pool/last-active) tabs/->path))
 
-(defn run-cmd [cmd & args]
-  "Runs `cmd` with `args`. Probably buggy, check implementation."
-  (let [child (exec (str cmd args)
-                         nil
-                         (fn [err stdout stderr]
-                           (if err
-                             (println "err: " err)
-                             (println stdout))))
-        ;input (.-stdin child)
-        ;output (.-stdout child)
-        ]
-    ;(do (.end input))
-    ))
+(defn run-cmd
+  ([cmd]
+     (run-cmd cmd identity identity))
+  ([cmd succ-cb]
+     (run-cmd cmd succ-cb identity))
+  ([cmd succ-cb fail-cb & args]
+    "Runs `cmd` with `args` and executes callbacks when finished. Probably buggy, check implementation."
+    (let [child (exec (str cmd args)
+                           nil
+                           (fn [err stdout stderr]
+                             (if err
+                               (do (println "err: " err) (fail-cb))
+                               (succ-cb stdout))))])))
 
-(defn gofmt [file]
-  "Performs `gofmt -w file`."
-  (let [cmd (str "gofmt -w " file)]
-    (notifos/working (str "gofmt " file "..."))
-    (run-cmd cmd)
-    (notifos/done-working "")))
+(defn get-last-active-editor []
+  "Gets the most recently accessed editor"
+  (pool/last-active))
 
-;; This should trigger
-(behavior ::fmt-on-save
-          :triggers #{:save}
-          :reaction (fn [editor]
-                      (let [path (-> @editor :info :path)]
-                        (gofmt path))))
+;;****************************************************
+;; Build & run related functions
+;;****************************************************
 
-(cmd/command {:command ::go-fmt
-              :desc "Go: fmt current file"
-              :exec (fn []
-                      (gofmt (cwf->path)))})
-
-;; go build
 (defn gobuild [file]
   "Performs `go build file`."
   (let [cmd (str "go build -o " (str (files/parent file) files/separator "main.exe" ) " " file )]
@@ -187,18 +178,62 @@
     (run-cmd cmd)
     (notifos/done-working "")))
 
-(cmd/command {:command ::go-build
-              :desc "Go: Build current file"
-              :exec (fn []
-                      (gobuild (cwf->path)))})
-
-;; go run
 (defn gorun [file]
   "Performs `go run file`."
   (let [cmd (str "go run " file )]
     (notifos/working (str "go run " file ))
     (run-cmd cmd)
     (notifos/done-working)))
+
+;;****************************************************
+;; Formatting
+;;****************************************************
+
+(defn gofmt [file]
+  "Performs `gofmt -w file`."
+  (let [cmd (str "gofmt -w " file)
+        editor (get-last-active-editor)
+        pos (ed/->cursor editor)
+        success-callback (fn []
+          (pool/reload editor)
+          (ed/move-cursor editor pos)
+          (notifos/done-working "Finished"))
+        failure-callback (fn []
+          (notifos/done-working "Unable to format"))]
+    (notifos/working (str "gofmt " file "..."))
+    (run-cmd cmd success-callback failure-callback)))
+
+(behavior ::fmt-on-save
+          :triggers #{:save}
+          :reaction (fn [editor]
+                      (let [path (-> @editor :info :path)]
+                        (gofmt path))))
+
+(ed/dirty? (get-last-active-editor))
+
+;;****************************************************
+;; Commands
+;;****************************************************
+
+(cmd/command {:command ::go-fmt
+              :desc "Go: fmt current file"
+              :exec (fn []
+                      ;TODO Ask user if they want to save
+                      (let [editor (get-last-active-editor)]
+                        (if (ed/dirty? editor)
+                          (popup/popup! {:header "Save file?"
+                             :body [:div
+                                     [:p "You need to save this file before you format it."]]
+                             :buttons [{:label "Cancel"}
+                                       {:label "Save"
+                                        :action (fn []
+                                                  (object/raise editor :save))}]}) ;We don't need to explicitly call fmt since fmt-on-save is bound to :save
+                          (gofmt (cwf->path)))))})
+
+(cmd/command {:command ::go-build
+              :desc "Go: Build current file"
+              :exec (fn []
+                      (gobuild (cwf->path)))})
 
 (cmd/command {:command ::go-run
               :desc "Go: Run current file"
@@ -230,23 +265,22 @@
                                         editor)
                           )))
 
-
+;Callback when suggestions are returned from the client
 (behavior ::finish-update-hints
           :triggers #{:editor.go.hints.result}
           :reaction (fn [editor res]
-                      ;Completions are of the format (#js {:completion "suggestion1"} #js {:completion "suggestion2"})
+                      ;Autocomplete suggestions are of the format (#js {:completion "suggestion1"} #js {:completion "suggestion2"})
                       (let [hints (map #(do #js {:completion %})(:hints res))]
                         (object/merge! editor {::hints hints})
                         (object/raise auto-complete/hinter :refresh!))))
 
-
-
+;Autocomplete starts here.
 (behavior ::use-local-hints
           :triggers #{:hints+}
           :reaction (fn [editor hints token]
-                      (when (not= token (::token @editor))
+                      (when (not= token (::token @editor)) ;Prevents autocomplete from being triggered when nothing's changed
                         (object/merge! editor {::token token})
                         (object/raise editor :editor.go.hints.update!))
-                      (if-let [go-hints (::hints @editor)]
+                      (if-let [go-hints (::hints @editor)] ;Makes sure that the hint box opens even if we don't have any hints from the client
                         go-hints
                         (:lt.plugins.auto-complete/hints @editor))))
