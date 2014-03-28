@@ -16,27 +16,22 @@
             [lt.plugins.auto-complete :as auto-complete])
   (:require-macros [lt.macros :refer [behavior]]))
 
+;;****************************************************
+;; Initialization
+;;****************************************************
+
 ;; Declares a new object called "go-lang" and also lets you assign things to it;
 ;; in your case a set of with just a tag.
 (object/object* ::go-lang
                 :tags #{:go.lang}
-                :behaviors [::fmt-on-save])
-
-;; This is, *sadly*, required to run other processes via JS.
-;; Sometimes the amount of abstractions to deal with to do
-;; simple things is ridiculous.
-(def exec (.-exec (js/require "child_process")))
-
-
-(def client-path
-  "Provides a fallback path at dev stage for plugins/*plugin-dir*, which
-  returns an empty string when using LightTable UI."
-  (let [dir plugins/*plugin-dir*]
-    (files/join (if (nil? dir) plugins/plugins-dir dir)
-                "LightTable-Go" "client" "light_table_go_client.go")))
+                :behaviors [])
 
 ;; Create object ::go-lang
 (def go (object/create ::go-lang))
+
+;;****************************************************
+;; Connections
+;;****************************************************
 
 ;; Attempts to establish a connection with the Go client.
 (defn try-connect [{:keys [info]}]
@@ -44,6 +39,7 @@
         client (clients/client! :go.client)
         obj (object/create ::connecting-notifier client)]
     (object/add-tags client [:tcp.client])
+    (notifos/working "Connecting to go client")
     (proc/exec {:command "go"
                 :args ["run" client-path tcp/port (clients/->id client)]
                 :cwd "."
@@ -94,6 +90,30 @@
                         (object/merge! this {:client client :buffer ""})
                         nil))
 
+
+
+;; When is this triggered? ::eval! above passes try-connect along by itself.
+(behavior ::connect
+          :triggers #{:connect}
+          :reaction (fn [this path]
+                      (try-connect {:info {:path path}})))
+
+
+;;****************************************************
+;; Eval code
+;;****************************************************
+
+;; Showing results of evaluation Go code
+(behavior ::go-result
+          :triggers #{:editor.eval.go.result}
+          :reaction (fn [editor res]
+                      (notifos/done-working)
+                      (object/raise editor
+                                    :editor.result
+                                    (:result res)
+                                    {:line (:end (:meta res))
+                                     :start-line (-> res :meta :start)})))
+
 ;; Behaviours related to initiating evaluation of go code.
 (behavior ::on-eval.one
           :triggers #{:eval.one}
@@ -124,26 +144,21 @@
                                       origin)
                         (notifos/done-working))))
 
-;; When is this triggered? ::eval! above passes try-connect along by itself.
-(behavior ::connect
-          :triggers #{:connect}
-          :reaction (fn [this path]
-                      (try-connect {:info {:path path}})))
-
-;; Showing results of evaluation Go code
-(behavior ::go-result
-          :triggers #{:editor.eval.go.result}
-          :reaction (fn [editor res]
-                      (notifos/done-working)
-                      (object/raise editor
-                                    :editor.result
-                                    (:result res)
-                                    {:line (:end (:meta res))
-                                     :start-line (-> res :meta :start)})))
-
 ;;****************************************************
 ;; Utility functions
 ;;****************************************************
+
+;; This is, *sadly*, required to run other processes via JS.
+;; Sometimes the amount of abstractions to deal with to do
+;; simple things is ridiculous.
+(def exec (.-exec (js/require "child_process")))
+
+(def client-path
+  "Provides a fallback path at dev stage for plugins/*plugin-dir*, which
+  returns an empty string when using LightTable UI."
+  (let [dir plugins/*plugin-dir*]
+    (files/join (if (nil? dir) plugins/plugins-dir dir)
+                "LightTable-Go" "client" "light_table_go_client.go")))
 
 (defn cwf->path []
   "Returns current working file path."
