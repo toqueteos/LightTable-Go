@@ -206,12 +206,14 @@
 
 (defn gofmt [file]
   "Performs `gofmt -w file`."
-  (let [cmd (str "gofmt -w " file)
+  (let [cmd (str "gofmt -w=true " file)
         editor (get-last-active-editor)
         pos (ed/->cursor editor)
+        scroll (.getScrollInfo (ed/->cm-ed editor)) ;.getScrollInfo isn't aliased by Light Table yet, so we're calling it directly on Codemirror. This should change if it ever becomes available (pull request?)
         success-callback (fn []
           (pool/reload editor)
           (ed/move-cursor editor pos)
+          (ed/scroll-to editor (.-left scroll) (.-top scroll))
           (notifos/done-working "Finished"))
         failure-callback (fn []
           (notifos/done-working "Unable to format"))]
@@ -223,8 +225,6 @@
           :reaction (fn [editor]
                       (let [path (-> @editor :info :path)]
                         (gofmt path))))
-
-(ed/dirty? (get-last-active-editor))
 
 ;;****************************************************
 ;; Commands
