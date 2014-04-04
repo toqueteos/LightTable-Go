@@ -24,10 +24,21 @@
 ;; in your case a set of with just a tag.
 (object/object* ::go-lang
                 :tags #{:go.lang}
-                :behaviors [])
+                :behaviors []
+                :settings {
+                            :go-fmt-command "gofmt -w=true"
+                            })
 
 ;; Create object ::go-lang
 (def go (object/create ::go-lang))
+
+(defn get-setting
+  [setting]
+  (get-in @go [:settings setting]))
+
+(defn set-setting
+  [setting value]
+  (swap! go (fn [x y] y) (assoc-in @go [:settings setting] value)))
 
 ;;****************************************************
 ;; Connections
