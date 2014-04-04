@@ -24,10 +24,10 @@
 ;; in your case a set of with just a tag.
 (object/object* ::go-lang
                 :tags #{:go.lang}
-                :behaviors []
+                :behaviors [::change-gofmt-command]
                 :settings {
                             :go-fmt-command "gofmt -w=true"
-                            })
+                           })
 
 ;; Create object ::go-lang
 (def go (object/create ::go-lang))
@@ -39,6 +39,29 @@
 (defn set-setting
   [setting value]
   (swap! go (fn [x y] y) (assoc-in @go [:settings setting] value)))
+
+
+;;****************************************************
+;; Behaviours the user might want to set
+;;****************************************************
+
+(comment
+(behavior ::line-numbers
+          :triggers #{:object.instant :lt.object/tags-removed}
+          :desc "Editor: Show line numbers"
+          :exclusive [::hide-line-numbers]
+          :type :user
+          :reaction (fn [this]
+                      (set-options this {:lineNumbers true}))))
+
+(behavior ::change-gofmt-command
+          :triggers #{:post-init}
+          :desc "Go plugin: Assign gofmt command. Note: -w=true is an essential parameter"
+          :params [{:label "Default: gofmt -w=true"}]
+          :type :user
+          :reaction (fn [this new-cmd]
+                      (set-setting :go-fmt-command new-cmd)))
+
 
 ;;****************************************************
 ;; Connections
@@ -217,7 +240,7 @@
 
 (defn gofmt [file]
   "Performs `gofmt -w file`."
-  (let [cmd (str "gofmt -w=true " file)
+  (let [cmd (str (get-setting :go-fmt-command) " " file)
         editor (get-last-active-editor)
         pos (ed/->cursor editor)
         scroll (.getScrollInfo (ed/->cm-ed editor)) ;.getScrollInfo isn't aliased by Light Table yet, so we're calling it directly on Codemirror. This should change if it ever becomes available (pull request?)
@@ -228,7 +251,7 @@
           (notifos/done-working "Finished"))
         failure-callback (fn []
           (notifos/done-working "Unable to format"))]
-    (notifos/working (str "gofmt " file "..."))
+    (notifos/working (str (get-setting :go-fmt-command) " " file "..."))
     (run-cmd cmd success-callback failure-callback)))
 
 (behavior ::fmt-on-save
