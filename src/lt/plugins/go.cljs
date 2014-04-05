@@ -24,10 +24,8 @@
 ;; in your case a set of with just a tag.
 (object/object* ::go-lang
                 :tags #{:go.lang}
-                :behaviors [::change-gofmt-command]
-                :settings {
-                            :go-fmt-command "gofmt -w=true"
-                           })
+                :behaviors []
+                :settings {})
 
 ;; Create object ::go-lang
 (def go (object/create ::go-lang))
@@ -38,30 +36,46 @@
 
 (defn set-setting
   [setting value]
-  (swap! go (fn [x y] y) (assoc-in @go [:settings setting] value)))
-
+  (object/update! go [:settings setting] (fn [] value )))
 
 ;;****************************************************
 ;; Behaviours the user might want to set
 ;;****************************************************
 
-(comment
-(behavior ::line-numbers
-          :triggers #{:object.instant :lt.object/tags-removed}
-          :desc "Editor: Show line numbers"
-          :exclusive [::hide-line-numbers]
-          :type :user
-          :reaction (fn [this]
-                      (set-options this {:lineNumbers true}))))
-
 (behavior ::change-gofmt-command
-          :triggers #{:post-init}
-          :desc "Go plugin: Assign gofmt command. Note: -w=true is an essential parameter"
-          :params [{:label "Default: gofmt -w=true"}]
+          :triggers #{:object.instant}
+          :for ::go-lang
+          :desc "Go plugin: Assign gofmt command"
+          :params [{:label "Default: 'gofmt -w=true" :type :keyword}]
           :type :user
           :reaction (fn [this new-cmd]
                       (set-setting :go-fmt-command new-cmd)))
 
+(behavior ::fmt-on-save
+          :triggers #{:save}
+          :for ::go-lang
+          :desc "Go plugin: Run gofmt on save"
+          :reaction (fn [editor]
+                      (let [path (-> @editor :info :path)]
+                        (gofmt path))))
+
+(behavior ::change-gorun-command
+          :triggers #{:object.instant}
+          :for ::go-lang
+          :desc "Go plugin: Assign go run command"
+          :params [{:label "Default: 'go run" :type :keyword}]
+          :type :user
+          :reaction (fn [this new-cmd]
+                      (set-setting :go-run-command new-cmd)))
+
+(behavior ::change-gobuild-command
+          :triggers #{:object.instant}
+          :for ::go-lang
+          :desc "Go plugin: Assign go build command"
+          :params [{:label "Default: 'go build -o" :type :keyword}]
+          :type :user
+          :reaction (fn [this new-cmd]
+                      (set-setting :go-build-command new-cmd)))
 
 ;;****************************************************
 ;; Connections
@@ -222,15 +236,15 @@
 
 (defn gobuild [file]
   "Performs `go build file`."
-  (let [cmd (str "go build -o " (str (files/parent file) files/separator "main.exe" ) " " file )]
-    (notifos/working (str "go build " file))
+  (let [cmd (str (get-setting :go-build-command) " " (str (files/parent file) files/separator "main.exe" ) " " file )]
+    (notifos/working cmd)
     (run-cmd cmd)
     (notifos/done-working "")))
 
 (defn gorun [file]
   "Performs `go run file`."
-  (let [cmd (str "go run " file )]
-    (notifos/working (str "go run " file ))
+  (let [cmd (str (get-setting :go-run-command) " " file )]
+    (notifos/working cmd)
     (run-cmd cmd)
     (notifos/done-working)))
 
@@ -254,12 +268,6 @@
     (notifos/working (str (get-setting :go-fmt-command) " " file "..."))
     (run-cmd cmd success-callback failure-callback)))
 
-(behavior ::fmt-on-save
-          :triggers #{:save}
-          :reaction (fn [editor]
-                      (let [path (-> @editor :info :path)]
-                        (gofmt path))))
-
 ;;****************************************************
 ;; Commands
 ;;****************************************************
@@ -267,7 +275,6 @@
 (cmd/command {:command ::go-fmt
               :desc "Go: fmt current file"
               :exec (fn []
-                      ;TODO Ask user if they want to save
                       (let [editor (get-last-active-editor)]
                         (if (ed/dirty? editor)
                           (popup/popup! {:header "Save file?"
@@ -288,6 +295,12 @@
               :desc "Go: Run current file"
               :exec (fn []
                       (gorun (cwf->path)))})
+
+(cmd/command {:command ::go-test
+              :desc "Go: Run tests in directory of current file"
+              :exec (fn []
+                      (gotest (cwf->path)))})
+
 
 ;;****************************************************
 ;; Autocomplete

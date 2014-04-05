@@ -7,7 +7,9 @@
 
      :editor.go [:lt.plugins.go/on-eval.one
                  :lt.plugins.go/go-result
-                 :lt.plugins.go/fmt-on-save
+                 (:lt.plugins.go/change-gofmt-command "gofmt -w=true")
+                 (:lt.plugins.go/change-gobuild-command "go build -o")
+                 (:lt.plugins.go/change-gorun-command "go run")
 
                  ; Same indentation as used by go fmt: using tabs of width 8.
                  (:lt.objs.editor/tab-settings true 8 8)
