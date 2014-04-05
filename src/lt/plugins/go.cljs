@@ -13,6 +13,9 @@
             [lt.objs.popup :as popup]
             [lt.objs.proc :as proc]
             [lt.objs.tabs :as tabs]
+
+            [clojure.string :as string]
+
             [lt.plugins.auto-complete :as auto-complete])
   (:require-macros [lt.macros :refer [behavior]]))
 
@@ -55,6 +58,7 @@
           :triggers #{:save}
           :for ::go-lang
           :desc "Go plugin: Run gofmt on save"
+          :type :user
           :reaction (fn [editor]
                       (let [path (-> @editor :info :path)]
                         (gofmt path))))
@@ -108,7 +112,6 @@
 (behavior ::on-out
           :triggers #{:proc.out}
           :reaction (fn [this data]
-                      (console/log ":on-out")
                       (let [out (.toString data)]
                         (object/update! this [:buffer] str out)
                         (when (> (.indexOf out "connected") -1)
@@ -119,7 +122,6 @@
 (behavior ::on-error
           :triggers #{:proc.error}
           :reaction (fn [this data]
-                      (console/log ":on-error")
                       (let [out (.toString data)]
                         (console/log out)
                         (when-not (> (.indexOf (:buffer @this) "connected") -1)
@@ -128,7 +130,6 @@
 (behavior ::on-exit
           :triggers #{:proc.exit}
           :reaction (fn [this data]
-                      (console/log ":on-exit")
                       (when-not (:connected @this)
                         (notifos/done-working)
                         (popup/popup! {:header "We couldn't connect."
@@ -207,24 +208,24 @@
 ;; simple things is ridiculous.
 (def exec (.-exec (js/require "child_process")))
 
+(def plugin-dir
+  "Gets the directory of this plugin, whether its in the user or light table plugins directory"
+  (let [plugin-dir (files/join plugins/plugins-dir "LightTable-Go")
+        user-plugin-dir (files/join plugins/user-plugins-dir "LightTable-Go")]
+    (if (files/exists? plugin-dir) plugin-dir user-plugin-dir)))
+
 (def client-path
   "Provides a fallback path at dev stage for plugins/*plugin-dir*, which
   returns an empty string when using LightTable UI."
-  (let [dir plugins/*plugin-dir*]
-    (files/join (if (nil? dir) plugins/plugins-dir dir)
-                "LightTable-Go" "client" "light_table_go_client.go")))
+    (files/join plugin-dir "client" "light_table_go_client.go"))
 
 (defn cwf->path []
   "Returns current working file path."
   (-> (pool/last-active) tabs/->path))
 
 (defn cwd->path []
-  "Returns current working directory. There's probably a safer way to write this"
-  (let [cwf-path (cwf->path)
-        last-back (.lastIndexOf cwf-path "\\")
-        last-forward (.lastIndexOf cwf-path "/")]
-        (subs cwf-path 0 (max last-back last-forward))
-    ))
+  "Returns current working directory."
+    (files/parent (cwf->path)))
 
 (defn run-cmd
   ([cmd]
@@ -293,8 +294,7 @@
   "Performs `go test`."
   (let [cmd (str (get-setting :go-test-command))]
     (notifos/working cmd)
-    (run-cmd cmd console/log)
-    (notifos/done-working)))
+    (run-cmd cmd (fn [arg](console/log arg)(notifos/done-working)))))
 
 ;;****************************************************
 ;; Commands
@@ -328,6 +328,15 @@
               :desc "Go: Run tests in directory of current file"
               :exec (fn []
                       (gotest (cwd->path)))})
+
+(cmd/command {:command ::go-plugin-help
+              :desc "Go: Show plugin readme"
+              :exec (fn []
+                      (let [path (files/join plugin-dir "readme.md")]
+                          (cmd/exec! :open-path path)))})
+                          ;(if-let [editor (first (pool/by-path path))] Doesn't seem to work?
+                           ; (object/add-tags editor :editor.read-only))))})
+
 
 ;;****************************************************
 ;; Autocomplete

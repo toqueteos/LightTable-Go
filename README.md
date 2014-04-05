@@ -6,11 +6,32 @@ I'm not a Clojure expert so don't expect too much fanciness here, changes are we
 
 ### Features
 
-1. `go fmt` integration, via command and after each save.
+1. `go fmt` integration, via command or after each save.
 2. Dummy eval `Ctrl+Enter` (check client/echo_server.go) instead of code evaluation. Needs integration with MarGo (like [GoSublime](https://github.com/DisposaBoy/GoSublime)).
-3. `go build` integration, via command. Builds in current file directory
-4. `go run` integration, via command.
+3. `go test` `go run` `go build` commands which can be re-bound.
+4. Plugin documentation (`Ctrl+Space` + "Go: Show plugin documentation")
 5. Package sensitive autocompletion, via [gocode](https://github.com/nsf/gocode). Gocode must be installed on your system & available on your path for this to work.
+
+### Configuration
+
+To configure this plugin, just attach the appropriate behaviors to :editor.go in your user.behaviors file. Example:
+
+`:editor.go [(:lt.plugins.go/change-gofmt-command "gofmt -w=true")
+             (:lt.plugins.go/change-gobuild-command "go build -o")
+             (:lt.plugins.go/change-gorun-command "go run")
+             (:lt.plugins.go/change-gotest-command "go test")]`
+
+The example given above shows the default values for the available commands.
+
+Additional behaviors for :editor.go:
+
+`(:lt.objs.editor/tab-settings use-tab tab-size spaces-per-indent)` -- Part of Light Table. In case you don't like Go's default style.
+
+`:lt.plugins.go/fmt-on-save` -- Runs gofmt whenever you save & replaces the editor contents with the formatted code.
+
+### Autocomplete
+
+For autocomplete to work, [Gocode](https://github.com/nsf/gocode) must be installed on your system & available on your path.
 
 ### Credits
 
