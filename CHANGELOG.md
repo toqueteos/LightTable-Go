@@ -1,9 +1,15 @@
 ## 0.1.1
 
- - Added installation instructions to README.md
+Bugfixes:
+
  - Disabled logging in client until a better log file location is found. It causes the
  client to die if it can't write to the log file.
- - Added environment variables to exec call
+ - Added environment variables to exec call. Should fix issues with systems not finding the go commands.
+
+Other:
+
+ - Added installation instructions to README.md
+
 
 ## 0.1.0
 
