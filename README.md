@@ -17,8 +17,11 @@ I'm not a Clojure expert so don't expect too much fanciness here, changes are we
 To configure this plugin, just attach the appropriate behaviors to :editor.go in your user.behaviors file. Example:
 
 `:editor.go [(:lt.plugins.go/change-gofmt-command "gofmt -w=true")
+
              (:lt.plugins.go/change-gobuild-command "go build -o")
+
              (:lt.plugins.go/change-gorun-command "go run")
+
              (:lt.plugins.go/change-gotest-command "go test")]`
 
 The example given above shows the default values for the available commands.
