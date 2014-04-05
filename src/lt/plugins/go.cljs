@@ -46,7 +46,7 @@
           :triggers #{:object.instant}
           :for ::go-lang
           :desc "Go plugin: Assign gofmt command"
-          :params [{:label "Default: 'gofmt -w=true" :type :keyword}]
+          :params [{:label "Default: 'gofmt -w=true'" :type :keyword}]
           :type :user
           :reaction (fn [this new-cmd]
                       (set-setting :go-fmt-command new-cmd)))
@@ -63,7 +63,7 @@
           :triggers #{:object.instant}
           :for ::go-lang
           :desc "Go plugin: Assign go run command"
-          :params [{:label "Default: 'go run" :type :keyword}]
+          :params [{:label "Default: 'go run'" :type :keyword}]
           :type :user
           :reaction (fn [this new-cmd]
                       (set-setting :go-run-command new-cmd)))
@@ -72,10 +72,19 @@
           :triggers #{:object.instant}
           :for ::go-lang
           :desc "Go plugin: Assign go build command"
-          :params [{:label "Default: 'go build -o" :type :keyword}]
+          :params [{:label "Default: 'go build -o'" :type :keyword}]
           :type :user
           :reaction (fn [this new-cmd]
                       (set-setting :go-build-command new-cmd)))
+
+(behavior ::change-gotest-command
+          :triggers #{:object.instant}
+          :for ::go-lang
+          :desc "Go plugin: Assign go test command"
+          :params [{:label "Default: 'go test'" :type :keyword}]
+          :type :user
+          :reaction (fn [this new-cmd]
+                      (set-setting :go-test-command new-cmd)))
 
 ;;****************************************************
 ;; Connections
@@ -105,8 +114,7 @@
                         (when (> (.indexOf out "connected") -1)
                           (do
                             (notifos/done-working)
-                            (object/merge! this {:connected true})
-                            )))))
+                            (object/merge! this {:connected true}))))))
 
 (behavior ::on-error
           :triggers #{:proc.error}
@@ -137,8 +145,6 @@
                 :init (fn [this client]
                         (object/merge! this {:client client :buffer ""})
                         nil))
-
-
 
 ;; When is this triggered? ::eval! above passes try-connect along by itself.
 (behavior ::connect
@@ -212,6 +218,14 @@
   "Returns current working file path."
   (-> (pool/last-active) tabs/->path))
 
+(defn cwd->path []
+  "Returns current working directory. There's probably a safer way to write this"
+  (let [cwf-path (cwf->path)
+        last-back (.lastIndexOf cwf-path "\\")
+        last-forward (.lastIndexOf cwf-path "/")]
+        (subs cwf-path 0 (max last-back last-forward))
+    ))
+
 (defn run-cmd
   ([cmd]
      (run-cmd cmd identity identity))
@@ -219,8 +233,11 @@
      (run-cmd cmd succ-cb identity))
   ([cmd succ-cb fail-cb & args]
     "Runs `cmd` with `args` and executes callbacks when finished. Probably buggy, check implementation."
-    (let [child (exec (str cmd args)
-                           nil
+   (console/log (cwd->path))
+    (let [cwd (cwd->path)
+          options (js-obj "cwd" cwd)
+          child (exec (str cmd args)
+                           options
                            (fn [err stdout stderr]
                              (if err
                                (do (println "err: " err) (fail-cb))
@@ -269,6 +286,17 @@
     (run-cmd cmd success-callback failure-callback)))
 
 ;;****************************************************
+;; Testing
+;;****************************************************
+
+(defn gotest [file]
+  "Performs `go test`."
+  (let [cmd (str (get-setting :go-test-command))]
+    (notifos/working cmd)
+    (run-cmd cmd console/log)
+    (notifos/done-working)))
+
+;;****************************************************
 ;; Commands
 ;;****************************************************
 
@@ -299,8 +327,7 @@
 (cmd/command {:command ::go-test
               :desc "Go: Run tests in directory of current file"
               :exec (fn []
-                      (gotest (cwf->path)))})
-
+                      (gotest (cwd->path)))})
 
 ;;****************************************************
 ;; Autocomplete
