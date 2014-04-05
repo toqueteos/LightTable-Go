@@ -1,3 +1,7 @@
+## 0.1.1
+
+ - Added installation instructions to README.md
+
 ## 0.1.0
 
 Features:

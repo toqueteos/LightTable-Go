@@ -12,6 +12,10 @@ I'm not a Clojure expert so don't expect too much fanciness here, changes are we
 4. Plugin documentation (`Ctrl+Space` + "Go: Show plugin documentation")
 5. Package sensitive autocompletion, via [gocode](https://github.com/nsf/gocode). Gocode must be installed on your system & available on your path for this to work.
 
+### Installation
+
+This plugin isn't available from the plugin manager in Light Table yet. For the time being, clone this repository into your Light Table plugins folder with the name "LightTable-Go".
+
 ### Configuration
 
 To configure this plugin, just attach the appropriate behaviors to :editor.go in your user.behaviors file. Example:
