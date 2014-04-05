@@ -1,6 +1,9 @@
 ## 0.1.1
 
  - Added installation instructions to README.md
+ - Disabled logging in client until a better log file location is found. It causes the
+ client to die if it can't write to the log file.
+ - Added environment variables to exec call
 
 ## 0.1.0
 

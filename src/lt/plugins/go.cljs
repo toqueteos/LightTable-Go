@@ -203,7 +203,9 @@
 ;; This is, *sadly*, required to run other processes via JS.
 ;; Sometimes the amount of abstractions to deal with to do
 ;; simple things is ridiculous.
+
 (def exec (.-exec (js/require "child_process")))
+(def user-env js/process.env)
 
 (def plugin-dir
   "Gets the directory of this plugin, whether its in the user or light table plugins directory"
@@ -233,7 +235,7 @@
     "Runs `cmd` with `args` and executes callbacks when finished. Probably buggy, check implementation."
    (console/log (cwd->path))
     (let [cwd (cwd->path)
-          options (js-obj "cwd" cwd)
+          options (js-obj "cwd" cwd "env" user-env)
           child (exec (str cmd args)
                            options
                            (fn [err stdout stderr]
@@ -329,7 +331,7 @@
 (cmd/command {:command ::go-plugin-help
               :desc "Go: Show plugin readme"
               :exec (fn []
-                      (let [path (files/join plugin-dir "readme.md")]
+                      (let [path (files/join plugin-dir "README.md")]
                           (cmd/exec! :open-path path)))})
                           ;(if-let [editor (first (pool/by-path path))] Doesn't seem to work?
                            ; (object/add-tags editor :editor.read-only))))})
