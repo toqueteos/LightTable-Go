@@ -13,9 +13,6 @@
             [lt.objs.popup :as popup]
             [lt.objs.proc :as proc]
             [lt.objs.tabs :as tabs]
-
-            [clojure.string :as string]
-
             [lt.plugins.auto-complete :as auto-complete])
   (:require-macros [lt.macros :refer [behavior]]))
 
