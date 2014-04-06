@@ -110,6 +110,7 @@
           :triggers #{:proc.out}
           :reaction (fn [this data]
                       (let [out (.toString data)]
+                        (console/log out)
                         (object/update! this [:buffer] str out)
                         (when (> (.indexOf out "connected") -1)
                           (do
@@ -235,7 +236,8 @@
     "Runs `cmd` with `args` and executes callbacks when finished. Probably buggy, check implementation."
    (console/log (cwd->path))
     (let [cwd (cwd->path)
-          options (js-obj "cwd" cwd "env" user-env)
+          options (js-obj "cwd" cwd
+                          "env" user-env)
           child (exec (str cmd args)
                            options
                            (fn [err stdout stderr]
@@ -381,3 +383,40 @@
                       (if-let [go-hints (::hints @editor)] ;Makes sure that the hint box opens even if we don't have any hints from the client
                         go-hints
                         (:lt.plugins.auto-complete/hints @editor))))
+
+;;****************************************************
+;; Docs
+;;****************************************************
+
+(behavior ::go-inline-doc
+          :triggers #{:editor.doc}
+          :reaction (fn [editor]
+                      (let [command :editor.go.doc
+                          cursor-location (ed/->cursor editor)
+                          info (assoc (@editor :info)
+                                 :pos cursor-location
+                                 :line (ed/line editor (:line cursor-location))
+                                 :code (.getValue (ed/get-doc editor))
+                                 :path (cwf->path))]
+                          (clients/send (eval/get-client! {:command command
+                                                           :info info
+                                                           :origin editor
+                                                           :create try-connect})
+                                        command
+                                        info
+                                        :only
+                                        editor)
+                          )))
+
+; :name :ns :args :doc
+(behavior ::print-inline-doc
+          :triggers #{:editor.go.doc} ;Todo - Modify the client so that it just echos the command back. We don't need two triggers for each command
+          :reaction (fn [editor result]
+                      (console/log (str "Got result" (:doc result)))
+                      ;(notifos/set-msg! "No docs found." {:class "error"}) ;TODO: Use this elsewhere instead of notifos
+                      (object/raise editor :editor.doc.show! (:doc result))))
+
+                      ;(when (= :doc (:result-type result))
+                       ; (if-not result
+                        ;  (notifos/set-msg! "No docs found." {:class "error"})
+                         ; (object/raise editor :editor.doc.show! result)))))
