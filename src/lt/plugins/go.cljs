@@ -317,8 +317,10 @@
                              :buttons [{:label "Cancel"}
                                        {:label "Save"
                                         :action (fn []
-                                                  (object/raise editor :save))}]}) ;We don't need to explicitly call fmt since fmt-on-save is bound to :save
-                          (gofmt (cwf->path)))))})
+                                                  (object/raise editor :save)
+                                                  (gofmt (cwf->path)))}]}) ;We don't need to explicitly call fmt since fmt-on-save is bound to :save
+                          ;
+                          )))})
 
 (cmd/command {:command ::go-build
               :desc "Go: Build current file"
