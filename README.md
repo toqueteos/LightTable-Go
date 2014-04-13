@@ -14,7 +14,7 @@ We aren't Clojure experts so don't expect too much fanciness here, changes are w
 
 ### Installation
 
-The version of this plugin in the plugin manager for Light Table is out of date.For the time being, clone this repository into your Light Table plugins folder with the name "LightTable-Go".
+The version of this plugin in the plugin manager for Light Table may be out of date. If you want the latest version, clone this repository into your Light Table plugins folder with the name "LightTable-Go".
 
 ### Configuration
 

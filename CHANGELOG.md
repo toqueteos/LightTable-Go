@@ -1,3 +1,10 @@
+## 0.1.3
+
+Bugfixes
+
+ - Go-fmt now works when used from the sidebar
+ - Go-test prints output to console for failed tests
+
 ## 0.1.2
 
 Features
