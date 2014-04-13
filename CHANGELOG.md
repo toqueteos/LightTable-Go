@@ -1,3 +1,9 @@
+## 0.1.2
+
+Features
+
+ - Added basic inline documentation
+
 ## 0.1.1
 
 Bugfixes:

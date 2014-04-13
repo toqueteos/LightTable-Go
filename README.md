@@ -2,7 +2,7 @@
 
 An unofficial Go language plugin for Light Table.
 
-I'm not a Clojure expert so don't expect too much fanciness here, changes are welcome.
+We aren't Clojure experts so don't expect too much fanciness here, changes are welcome.
 
 ### Features
 
@@ -39,6 +39,11 @@ Additional behaviors for :editor.go:
 ### Autocomplete
 
 For autocomplete to work, [Gocode](https://github.com/nsf/gocode) must be installed on your system & available on your path.
+
+### Inline docs
+
+Basic inline documentation (default: ctrl-d) is available for package level functions. Does not currently work for struct methods or packages with a /
+in their name (net/http, for example), or show arguments for the functions. It's all on the to-do list.
 
 ### Credits
 
