@@ -490,11 +490,8 @@ func getDocPackage( package_name string ) ( *doc.Package, error ) {
 
 func searchDocs( package_name string, func_name string ) ( *Doc, error ) {
     if pkg, err := getDocPackage( package_name ); err == nil {
-        fmt.Println( "Got package " + package_name )
         if func_name != "" {
-            fmt.Println( "Iterating over funcs")
             for _, v := range pkg.Funcs {
-                fmt.Println( v.Name )
                 if v.Name == func_name {
                     doc := &Doc{}
                     doc.Ns = package_name

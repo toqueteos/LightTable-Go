@@ -30,6 +30,9 @@
 ;; Create object ::go-lang
 (def go (object/create ::go-lang))
 
+;; Only for people developing this plugin. Setting to true will print stdout from the client to the console.
+(def debug-mode true)
+
 (defn get-setting
   [setting]
   (get-in @go [:settings setting]))
@@ -110,7 +113,7 @@
           :triggers #{:proc.out}
           :reaction (fn [this data]
                       (let [out (.toString data)]
-                        (console/log out)
+                        (when debug-mode (console/log out))
                         (object/update! this [:buffer] str out)
                         (when (> (.indexOf out "connected") -1)
                           (do
@@ -229,21 +232,21 @@
 
 (defn run-cmd
   ([cmd]
-     (run-cmd cmd identity identity))
+     (run-cmd cmd (fn [x y z] (identity x)) (fn [x y z] (println "Error: " x ))))
   ([cmd succ-cb]
-     (run-cmd cmd succ-cb identity))
+     (run-cmd cmd succ-cb (fn [x y z] (println "Error: " x ))))
   ([cmd succ-cb fail-cb & args]
     "Runs `cmd` with `args` and executes callbacks when finished. Probably buggy, check implementation."
-   (console/log (cwd->path))
     (let [cwd (cwd->path)
+          ;Options for node's exec function
           options (js-obj "cwd" cwd
-                          "env" user-env)
-          child (exec (str cmd args)
-                           options
-                           (fn [err stdout stderr]
-                             (if err
-                               (do (println "err: " err) (fail-cb))
-                               (succ-cb stdout))))])))
+                          "env" user-env)]
+          (exec (str cmd args)
+                     options
+                    (fn [err stdout stderr]
+                      (if err
+                        (fail-cb err stdout stderr)
+                        (succ-cb err stdout stderr)))))))
 
 (defn get-last-active-editor []
   "Gets the most recently accessed editor"
@@ -293,9 +296,11 @@
 
 (defn gotest [file]
   "Performs `go test`."
-  (let [cmd (str (get-setting :go-test-command))]
+  (let [cmd (str (get-setting :go-test-command))
+        success-callback (fn [err stdout stderr](console/log stdout)(notifos/done-working))
+        failure-callback success-callback]
     (notifos/working cmd)
-    (run-cmd cmd (fn [arg](console/log arg)(notifos/done-working)))))
+    (run-cmd cmd success-callback failure-callback)))
 
 ;;****************************************************
 ;; Commands
