@@ -14,6 +14,12 @@ import (
     "strconv"
     "strings"
     "sync"
+
+    "go/build"
+    "go/token"
+    "go/parser"
+    "go/doc"
+    "errors"
 )
 
 const (
@@ -278,144 +284,20 @@ func AutoCompleteHandler(m *Message) {
     Send(m.Cid, "editor.go.hints.result", i)
 }
 
-// Takes a string like strings.Replace(m.Info.Code, "\\n", "\n", -1) and isolates the strings.Replace part.
-// For getting documentation. Is there a better way to do this?
-func GetQuerySubject(line string, cursorPos int) []string {
-	querySubjectStart := cursorPos
-	querySubjectEnd := cursorPos
-
-	var queryDelims string = "\t()[]&|!#/*- "
-
-	for querySubjectStart > 0 && strings.IndexByte(queryDelims, line[querySubjectStart]) == -1 {
-		querySubjectStart--
-	}
-
-	for querySubjectEnd < len(line) && strings.IndexByte(queryDelims, line[querySubjectEnd]) == -1 {
-		querySubjectEnd++
-	}
-
-    query := strings.Split( strings.TrimSpace( line[querySubjectStart:querySubjectEnd] ), "." )
-
-    fmt.Printf( "Doc query: %v\n", query )
-
-	return query
-}
-
-func SearchDocs( query []string ) *Doc {
-
-    fmt.Printf( "query %v\n", query)
-
-    cmd := exec.Command("godoc", query... )
-
-    //in := strings.NewReader(query)
-    var out bytes.Buffer
-    var stderr bytes.Buffer
-    //cmd.Stdin = in
-    cmd.Stdout = &out
-    cmd.Stderr = &stderr
-
-    err := cmd.Run()
-    if err != nil {
-        log.Println("[Searchdocs] Couldn't exec godoc.")
-        fmt.Printf( "[Searchdocs] Couldn't exec godoc. %s\n", stderr.String() )
-        return nil
-    }
-
-
-
-    //TODO: Replace logs with printf so that the light table user can see them.
-
-    result_lines := strings.Split( out.String(), "\n" )
-
-    var namespace string
-    var name string
-    //var args string
-    var docs string
-
-    state := "PACKAGE"
-
-    for i := 0; i < len( result_lines ); i++ {
-        line := result_lines[i]
-        if state == "PACKAGE" && strings.Contains( line, "package" ) {
-            // Get the package name
-            splitline := strings.Split( line, " " )
-            if len( splitline ) > 1 {
-                namespace = splitline[1]
-            }
-            state = "FUNC"
-            continue
-        }
-
-        if state == "FUNC" {
-            if strings.Contains( line, "FUNCTIONS" ) {
-                i = i + 2
-                if i < len( result_lines ) {
-                    name = result_lines[i]
-
-                    var docbuffer bytes.Buffer
-
-                    i += 1
-                    for i < len( result_lines ) && result_lines[i] != "" {
-                        docbuffer.WriteString( strings.TrimSpace( result_lines[i] ) )
-                        docbuffer.WriteString( "\n" )
-                        i++
-                    }
-                    docs = docbuffer.String()
-                }
-                break
-            }
-        }
-    }
-
-    doc := &Doc{}
-
-    doc.Name = name
-    doc.Ns = namespace
-    doc.Doc = docs
-
-    fmt.Printf( "Docs: %+v", doc )
-
-    /*
-    	Name string `json:"name"`
-	Ns   string `json:"ns"`
-	Args string `json:"args"`
-	Doc  string `json:"doc"`
-	Loc  *Pos   `json:"loc"`
-    */
-    return doc
-}
-
 // Dochandler sends responses to "editor.doc.go" requests.
 func DocHandler(m *Message) {
 	defer wg.Done()
-
 	//TODO Find out the document encoding
 
 	var i Info
-	var doc *Doc
-
-    /*
-	doc.Name = "Name"
-	//doc.Ns = "Namespace"
-	//doc.Args = "Args"
-	doc.Doc = "Docs"
-	doc.Loc = m.Info.Pos
-
-	i.Doc = &doc
-*/
 
 	var code string = strings.Replace(m.Info.Code, "\\n", "\n", -1)
 	var pos *Pos = m.Info.Pos
-	//var path string = m.Info.Path
+
 	var splitCode []string = strings.Split(code, "\n")
-	//var in *strings.Reader
-	//var out bytes.Buffer
+
 	var line string
 	var linePos int = pos.Ch
-	//var querySubject string
-
-	//var unprocessed_hints []string
-	//var hints []string
 
 	if len(splitCode) <= pos.Line {
 		return //TODO Send error?
@@ -428,46 +310,16 @@ func DocHandler(m *Message) {
 		linePos = len(line)
 	}
 
-    query := GetQuerySubject(line, linePos)
-    doc = SearchDocs( query )
-    doc.Loc = pos
+    pkg_name, func_name := GetQuerySubject(line, linePos)
+    if docs, err := searchDocs( pkg_name, func_name ); err != nil {
+        return // Couldn't get docs
+    } else {
+        docs.Loc = pos // Why is this a problem?
+        i.Doc = docs
 
-    i.Doc = doc
-
-	/*
-
-
-		// If the incoming source code is unicode, should be c%d below.
-		cmd := exec.Command("gocode", "-f=csv", "autocomplete", path, fmt.Sprintf("%d", byteCount))
-
-		in = strings.NewReader(code)
-		cmd.Stdin = in
-		cmd.Stdout = &out
-
-		err := cmd.Run()
-		if err != nil {
-			log.Println("[AutoCompleteHandler] Couldn't exec gocode.")
-			return
-		}
-
-		i.Result = m.Info.Code
-		i.Pos = m.Info.Pos
-
-		// Parse the autocomplete results
-		unprocessed_hints = strings.Split(out.String(), "\n")
-		hints = make([]string, len(unprocessed_hints))
-
-		for i, hint := range unprocessed_hints {
-			splitHints := strings.Split(hint, ",")
-			if len(splitHints) >= 5 {
-				hints[i] = splitHints[2] //splitHints[4] has the function signature data, but light table can't use that yet.
-			}
-		}
-
-		i.Hints = hints
-	*/
-	fmt.Printf("Getting docs")
-	Send(m.Cid, "editor.go.doc", i)
+        fmt.Printf("Getting docs")
+        Send(m.Cid, "editor.go.doc", i)
+    }
 }
 
 type Message struct {
@@ -491,14 +343,6 @@ type Info struct {
     Hints      []string `json:"hints,omitempty"`
     // Msg      string   `json:"msg,omitempty"`
     // File     string   `json:"file,omitempty"`
-}
-
-type Doc struct {
-	Name string `json:"name"`
-	Ns   string `json:"ns"`
-	Args string `json:"args"`
-	Doc  string `json:"doc"`
-	Loc  *Pos   `json:"loc"`
 }
 
 type Meta struct {
@@ -579,4 +423,89 @@ func HandleSignals() {
 
     Stop()
     //fmt.Println("Got signal:", s)
+}
+
+/******************
+ * Doc stuff
+ ******************/
+
+type Doc struct {
+	Name string `json:"name"`
+	Ns   string `json:"ns"` // Package - named Ns because that's what Light Table wants.
+    Type string `json:"type"`
+	Args string `json:"args"`
+	Doc  string `json:"doc"`
+	Loc  *Pos   `json:"loc"`
+}
+
+// Takes a string like strings.Replace(m.Info.Code, "\\n", "\n", -1) and isolates the package name and function.
+// For getting documentation. TODO: Figure out a better approach
+func GetQuerySubject(line string, cursorPos int) (string, string) {
+	querySubjectStart := cursorPos
+	querySubjectEnd := cursorPos
+
+	var queryDelims string = "\t()[]&|!#/*- "
+
+	for querySubjectStart > 0 && strings.IndexByte(queryDelims, line[querySubjectStart]) == -1 {
+		querySubjectStart--
+	}
+
+	for querySubjectEnd < len(line) && strings.IndexByte(queryDelims, line[querySubjectEnd]) == -1 {
+		querySubjectEnd++
+	}
+
+    query := strings.Split( strings.TrimSpace( line[querySubjectStart:querySubjectEnd] ), "." )
+
+    if len( query ) != 2 {
+        fmt.Printf( "Error with query. %v\n", query )
+        return "", ""
+    }
+
+	return query[0], query[1]
+}
+
+// Gets a doc.Package struct from the package name. Returns success or failure
+func getDocPackage( package_name string ) ( *doc.Package, error ) {
+    // Import the pkg name to get a list of its source files. TODO - gopath?
+    fset := token.NewFileSet()
+
+    if pkg, err := build.Default.Import(package_name, build.Default.GOROOT, build.AllowBinary); err != nil {
+        //error
+        return nil, errors.New( "Package not found")
+    } else if pkg, err = build.Default.Import(package_name, build.Default.GOPATH, build.AllowBinary); err != nil {
+        //error
+        return nil, errors.New( "Package not found")
+    } else {
+        if parsed_dir, err := parser.ParseDir( fset, pkg.Dir, nil, parser.ParseComments ); err != nil {
+            return nil, err
+        } else {
+            for _, val := range parsed_dir { // This is a bad solution. Loops over the packages found and ignores their names.
+                return doc.New( val, pkg.ImportPath, 0 ), nil
+            }
+
+            return nil, errors.New( "Package not found")
+        }
+    }
+}
+
+func searchDocs( package_name string, func_name string ) ( *Doc, error ) {
+    if pkg, err := getDocPackage( package_name ); err == nil {
+        fmt.Println( "Got package " + package_name )
+        if func_name != "" {
+            fmt.Println( "Iterating over funcs")
+            for _, v := range pkg.Funcs {
+                fmt.Println( v.Name )
+                if v.Name == func_name {
+                    doc := &Doc{}
+                    doc.Ns = package_name
+                    doc.Name = func_name
+                    doc.Doc = v.Doc
+                    return doc, nil
+                }
+            }
+        }
+        return nil, errors.New( "Couldn't get docs for " + package_name + " " + func_name )
+    } else {
+        return nil, errors.New( "Couldn't get docs for " + package_name + " " + func_name )
+    }
 }

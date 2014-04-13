@@ -412,11 +412,4 @@
 (behavior ::print-inline-doc
           :triggers #{:editor.go.doc} ;Todo - Modify the client so that it just echos the command back. We don't need two triggers for each command
           :reaction (fn [editor result]
-                      (console/log (str "Got result" (:doc result)))
-                      ;(notifos/set-msg! "No docs found." {:class "error"}) ;TODO: Use this elsewhere instead of notifos
                       (object/raise editor :editor.doc.show! (:doc result))))
-
-                      ;(when (= :doc (:result-type result))
-                       ; (if-not result
-                        ;  (notifos/set-msg! "No docs found." {:class "error"})
-                         ; (object/raise editor :editor.doc.show! result)))))
