@@ -11,6 +11,7 @@
                  (:lt.plugins.go/change-gobuild-command "go build -o")
                  (:lt.plugins.go/change-gorun-command "go run")
                  (:lt.plugins.go/change-gotest-command "go test")
+                 (:lt.plugins.go/show-console-on-go-command false)
 
                  ; Same indentation as used by go fmt: using tabs of width 8.
                  (:lt.objs.editor/tab-settings true 8 8)

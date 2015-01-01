@@ -90,6 +90,15 @@
           :reaction (fn [this new-cmd]
                       (set-setting :go-test-command new-cmd)))
 
+(behavior ::show-console-on-go-command
+          :triggers #{:object.instant}
+          :for ::go-lang
+          :desc "Go plugin: Show console for go command output"
+          :params [{:label "Default: false"}]
+          :type :user
+          :reaction (fn [this show]
+                      (set-setting :go-show-console show)))
+
 ;;****************************************************
 ;; Connections
 ;;****************************************************
@@ -248,6 +257,28 @@
                         (fail-cb err stdout stderr)
                         (succ-cb err stdout stderr)))))))
 
+(defn console-callback
+  ([] (console-callback nil))
+  ([err?] (console-callback nil true))
+  ([err? done?] (console-callback err? done? true))
+  ([err? done? show?]
+   (fn [res-or-err stdout stderr]
+     (let [outfn console/log
+           errfn console/error]
+       (when (not err?) (outfn res-or-err))
+       (when stdout (outfn stdout))
+       (when stderr (errfn stderr)))
+     (when done? (notifos/done-working))
+     (when show? (cmd/exec! :console.show)))))
+
+(defn make-cb [err? done?]
+  (console-callback err?
+                    done?
+                    (get-setting :go-show-console)))
+
+(defn succ-cb [] (make-cb false true))
+(defn err-cb [] (make-cb true true))
+
 (defn get-last-active-editor []
   "Gets the most recently accessed editor"
   (pool/last-active))
@@ -260,15 +291,14 @@
   "Performs `go build file`."
   (let [cmd (str (get-setting :go-build-command) " " (str (files/parent file) files/separator "main.exe" ) " " file )]
     (notifos/working cmd)
-    (run-cmd cmd)
+    (run-cmd cmd (succ-cb) (err-cb))
     (notifos/done-working "")))
 
 (defn gorun [file]
   "Performs `go run file`."
-  (let [cmd (str (get-setting :go-run-command) " " file )]
+  (let [cmd (str (get-setting :go-run-command) " " file)]
     (notifos/working cmd)
-    (run-cmd cmd)
-    (notifos/done-working)))
+    (run-cmd cmd (succ-cb) (err-cb))))
 
 ;;****************************************************
 ;; Formatting
@@ -296,11 +326,9 @@
 
 (defn gotest [file]
   "Performs `go test`."
-  (let [cmd (str (get-setting :go-test-command))
-        success-callback (fn [err stdout stderr](console/log stdout)(notifos/done-working))
-        failure-callback success-callback]
+  (let [cmd (str (get-setting :go-test-command))]
     (notifos/working cmd)
-    (run-cmd cmd success-callback failure-callback)))
+    (run-cmd cmd (succ-cb) (err-cb))))
 
 ;;****************************************************
 ;; Commands
